@@ -1,2 +1,2 @@
-# Practica_Machine_Learning
+# Practical_Machine_Learning
 Practical Machine Learning of Coursera Data Science specialization
