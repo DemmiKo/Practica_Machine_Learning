@@ -1,0 +1,140 @@
+---
+title: "Practical Machine Learning"
+author: "Dimitra Kotsila"
+date: "August 1, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+#### Human Activity Recognition Project
+Using devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. The goal of this project is to predict the manner in which people did the exercise. For that, 6 participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Data from accelerometers on the belt, forearm, arm, and dumbell of all participants will be used. 
+
+## Data Preparation
+
+### Load Libraries
+
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(knitr)
+#library(e1071)
+```
+
+### Load Data
+
+
+```{r load_dat, echo=TRUE}
+trainUrl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train_data <- read.csv(url(trainUrl), na.strings = c("NA", ""))
+test_data <- read.csv(url(testUrl), na.strings = c("NA", ""))
+
+
+dim(train_data)
+dim(test_data)
+```
+
+So, train dataset has `r dim(train_data)[1]` rows and `r dim(train_data)[2]` variables and test dataset has `r dim(test_data)[1]` rows and `r dim(test_data)[2]` variables.
+
+
+### Clean datasets
+
+* Remove variables with NA values
+* Check if train and test datasets have the same variables
+* Remove the first 7 variables since they have little predictiong power
+
+```{r filter_data}
+
+train_data_final <- train_data[, colSums(is.na(train_data)) == 0]
+test_data_final <- test_data[, colSums(is.na(test_data)) == 0]
+
+# Find variables that are different in two datasets (the difference will be in classe variable)
+diff <- names(train_data_final)[names(train_data_final) != names(test_data_final)]
+diff
+
+# Remove useless variables
+train_data_final <- train_data_final[, -c(1:7)]
+test_data_final <- test_data_final[, -c(1:7)]
+
+
+```
+
+### Split data
+ 
+We split train dataset into train_sub (80%) and test_sub (20%) in order to validate the model (cross validation).
+```{r split_data}
+
+set.seed(414243) 
+valid_train <- createDataPartition(train_data_final$classe, p = 0.8, list = FALSE)
+train_sub <- train_data_final[valid_train, ]
+test_sub <- train_data_final[-valid_train, ]
+
+```
+
+
+## Prediction Models
+
+### Decision trees
+We set k = 8 in k-fold cross validation.
+
+```{r decision_trees}
+
+control <- trainControl(method = "cv", number = 8)
+model_decision_tree <- train(classe ~ ., data = train_sub, method = "rpart", 
+                             trControl = control)
+
+model_decision_tree
+
+fancyRpartPlot(model_decision_tree$finalModel)
+
+# predict outcomes using validation set
+predict_decision_tree <- predict(model_decision_tree, test_sub)
+# Show prediction result
+(conf_decision_tree <- confusionMatrix(test_sub$classe, predict_decision_tree))
+
+```
+As we see on the confusion matrix, the accuracy rate is  close to 0.5. Thus, the out-of-sample error rate is 0.5. The decision tree model does not predict our sample data so  well. 
+
+
+## Random Forest
+
+```{r random_forest}
+
+model_random_forest <- train(classe ~ ., data = train_sub, method = "rf",
+                             trControl = control)
+
+model_random_forest
+
+plot(model_random_forest)
+
+# predict outcomes using validation set
+predict_random_forest <- predict(model_random_forest, test_sub)
+# Show prediction result
+(conf_random_forest <- confusionMatrix(test_sub$classe, predict_random_forest))
+
+```
+The Accurancy of Random Forest is very high 0.9939. 
+
+
+
+
+## Prediction on Test dataset 
+
+The Random Forest model has higher accurancy. So we predict the classe of test data set.
+```{r prediction_test}
+
+(predict(model_random_forest, test_data_final))
+
+```
+
+
